@@ -3,7 +3,6 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
-        maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
     }
 }
 dependencyResolutionManagement {
@@ -11,9 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-
     }
 }
 rootProject.name = "WhisperCppDemo"
-//include ':app', ':json-kotlinx'
 include ':app'
