@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlinx-serialization'
+//    id('ktor-serialization-kotlinx-json').version('1.8.0')
 }
 
 android {
@@ -62,6 +64,13 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.5.1'
     implementation "com.google.accompanist:accompanist-permissions:0.28.0"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
+    implementation "io.ktor:ktor-client-core:2.2.4"
+    implementation "io.ktor:ktor-client-android:2.2.4" // For Android
+    implementation "io.ktor:ktor-client-json:2.2.4"
+    implementation "io.ktor:ktor-client-serialization:2.2.4"
+    implementation "io.ktor:ktor-client-content-negotiation:2.2.4"
+    implementation "io.ktor:ktor-serialization-kotlinx-json:2.2.4"
+//    implementation project(':json-kotlinx')
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.4'

@@ -21,8 +21,44 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.client.engine.android.Android
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.kotlinx.serializer.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.plugins.contentnegotiation.*
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
+
+//import ktor
+//import io.ktor.client.HttpClient
+//import io.ktor.client.engine.android.Android
+//import io.ktor.client.features.json.JsonFeature
+//import io.ktor.client.features.json.serializer.KotlinxSerializer
+//import io.ktor.client.request.get
+//import io.ktor.client.statement.HttpStatement
+//import kotlinx.serialization.Serializable
+//import kotlinx.serialization.json.Json
+
 
 private const val LOG_TAG = "MainScreenViewModel"
+
+@Serializable data class Message(val role: String, val content: String)
+
+@Serializable data class OpenAIData(val model: String, val messages: List<Message>)
 
 class MainScreenViewModel(private val application: Application) : ViewModel() {
     var canTranscribe by mutableStateOf(false)
@@ -38,7 +74,17 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private var whisperContext: WhisperContext? = null
     private var mediaPlayer: MediaPlayer? = null
     private var recordedFile: File? = null
-
+    val client = HttpClient(Android) {
+//        serializer = KotlinxSerializer(Json {
+        install(ContentNegotiation) {
+            json(Json {})
+        }
+//            prettyPrint = true
+//            isLenient = true
+//        })
+    }
+    val OPENAI_API_KEY ="OPENAI_API_KEY"
+//    val hist = ListOf(Message)
     init {
         viewModelScope.launch {
             printSystemInfo()
@@ -77,9 +123,20 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private suspend fun loadBaseModel() = withContext(Dispatchers.IO) {
         printMessage("Loading model...\n")
         val models = application.assets.list("models/")
+        models?.let {
+            for (model in it) {
+                printMessage(model)
+                printMessage("\n")
+
+            }
+        } ?: run {
+            println("Error: Could not list models.")
+        }
+
         if (models != null) {
-            whisperContext = WhisperContext.createContextFromAsset(application.assets, "models/" + models[0])
-            printMessage("Loaded model ${models[0]}.\n")
+            whisperContext =
+                WhisperContext.createContextFromAsset(application.assets, "models/" + models[2])
+            printMessage("Loaded model ${models[2]}.\n")
         }
 
         //val firstModel = modelsPath.listFiles()!!.first()
@@ -102,9 +159,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         canTranscribe = false
 
         printMessage("Running benchmark. This will take minutes...\n")
-        whisperContext?.benchMemory(nthreads)?.let{ printMessage(it) }
+        whisperContext?.benchMemory(nthreads)?.let { printMessage(it) }
         printMessage("\n")
-        whisperContext?.benchGgmlMulMat(nthreads)?.let{ printMessage(it) }
+        whisperContext?.benchGgmlMulMat(nthreads)?.let { printMessage(it) }
 
         canTranscribe = true
     }
@@ -145,7 +202,28 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             val start = System.currentTimeMillis()
             val text = whisperContext?.transcribeData(data)
             val elapsed = System.currentTimeMillis() - start
-            printMessage("Done ($elapsed ms): $text\n")
+
+            val msg = "Done ($elapsed ms): $text\n"
+            printMessage(msg)
+
+            val to_send = OpenAIData("gpt-3.5-turbo", listOf(Message("user", text!!)))
+            val jsonString = Json.encodeToString(to_send)
+
+            val response: HttpResponse = client.post("https://api.openai.com/v1/chat/completions") {
+
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $OPENAI_API_KEY")
+                setBody(jsonString)
+            }
+            val jsonObject = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val choices = jsonObject["choices"] as JsonArray
+            val firstChoice = choices[0].jsonObject
+            val message = firstChoice["message"] as JsonObject
+            val content = message["content"]!!.jsonPrimitive.content
+
+            println(content)
+            printMessage(content)
+
         } catch (e: Exception) {
             Log.w(LOG_TAG, e)
             printMessage("${e.localizedMessage}\n")
@@ -153,6 +231,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
         canTranscribe = true
     }
+
 
     fun toggleRecord() = viewModelScope.launch {
         try {
@@ -180,6 +259,15 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             isRecording = false
         }
     }
+
+    suspend fun loadSelectedModel(modelName: String) {
+        printMessage("Loading model $modelName...\n")
+        whisperContext =
+            WhisperContext.createContextFromAsset(application.assets, "models/$modelName")
+        printMessage("Loaded model $modelName.\n")
+        canTranscribe = true
+    }
+
 
     private suspend fun getTempFileForRecording() = withContext(Dispatchers.IO) {
         File.createTempFile("recording", "wav")
@@ -223,3 +311,4 @@ private suspend fun Context.copyData(
         Log.v(LOG_TAG, "Copied $assetPath to $destination")
     }
 }
+
