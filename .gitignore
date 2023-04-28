@@ -36,4 +36,4 @@ extra/bench-gg.txt
 
 *.mlmodel*
 
-*.bin
+*.bin*.bin
